@@ -7,16 +7,37 @@ require 'scraped'
 require 'scraperwiki'
 require 'wikidata_ids_decorator'
 
-def scraper(h)
-  url, klass = h.to_a.first
-  klass.new(response: Scraped::Request.new(url: url).response)
+module Scraped
+  class Scraper
+    def initialize(h)
+      @url, @klass = h.to_a.first
+    end
+
+    def store(method, index: %i[id], table: 'data', clobber: true, debug: ENV['MORPH_DEBUG'])
+      data = scraper.send(method)
+      data.each { |mem| puts mem.reject { |_, v| v.to_s.empty? }.sort_by { |k, _| k }.to_h } if debug
+      ScraperWiki.sqliteexecute('DROP TABLE %s' % table) rescue nil if clobber
+      ScraperWiki.save_sqlite(index, data, table)
+    end
+
+    private
+
+    attr_reader :url, :klass
+
+    def scraper
+      klass.new(response: Scraped::Request.new(url: url).response)
+    end
+  end
 end
 
 class MemberList < Scraped::HTML
   decorator WikidataIdsDecorator::Links
 
   field :members do
-    member_rows.map { |tr| fragment(tr => MemberRow).to_h }
+    member_rows.map do |tr|
+      mem = fragment(tr => MemberRow).to_h
+      mem.merge(party_id: faction_id(mem[:party]))
+    end
   end
 
   def faction_id(str)
@@ -75,12 +96,4 @@ class MemberRow < Scraped::HTML
 end
 
 url = 'https://de.wikipedia.org/wiki/Liste_der_Mitglieder_des_Abgeordnetenhauses_von_Berlin_(18._Wahlperiode)'
-
-page = scraper(url => MemberList)
-data = page.members.each do |mem|
-  mem[:party_id] ||= page.faction_id(mem[:party])
-end
-data.each { |mem| puts mem.reject { |_, v| v.to_s.empty? }.sort_by { |k, _| k }.to_h } if ENV['MORPH_DEBUG']
-
-ScraperWiki.sqliteexecute('DROP TABLE data') rescue nil
-ScraperWiki.save_sqlite(%i[id], data)
+Scraped::Scraper.new(url => MemberList).store(:members, index: %i[name party])
