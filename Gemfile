@@ -17,7 +17,7 @@ gem 'pry'
 gem 'rake'
 gem 'rest-client'
 gem 'rubocop'
-gem 'scraped', github: 'everypolitician/scraped'
+gem 'scraped', github: 'everypolitician/scraped', branch: 'scraper-class'
 gem 'scraped_page_archive', github: 'everypolitician/scraped_page_archive'
 gem 'scraper_test', github: 'everypolitician/scraper_test'
 gem 'scraperwiki', github: 'openaustralia/scraperwiki-ruby',
